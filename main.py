@@ -21,6 +21,7 @@ from pydantic import BaseModel
 
 def cria_banco_vetorial():
 
+  # carrega o código fonte para o banco de dados vetorial
   repo_path = Path(__file__).resolve().parent
   print(str(repo_path))
 
@@ -55,6 +56,7 @@ def cria_banco_vetorial():
   return vectordb
 
 def cria_chat(vectordb):
+    # cria o chat com o modelo de linguagem e o banco vetorial
     llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=os.getenv("OPENAI_API_KEY"), verbose=True)
     memory = ConversationSummaryMemory(llm=llm, memory_key = "chat_history", return_messages=True)
     qa = ConversationalRetrievalChain.from_llm(llm, retriever=vectordb.as_retriever(search_type="mmr", search_kwargs={"k":8}), memory=memory)
