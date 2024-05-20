@@ -11,3 +11,4 @@ PyPDF2==3.0.1
 chromadb==0.5.0
 unstructured[all]
 unstructured[local-inference]
+unstructured[qdrant]
