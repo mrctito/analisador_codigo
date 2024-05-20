@@ -65,7 +65,7 @@ def main():
     qa = cria_chat(vectordb)
     
     while True:
-        pergunta = input("O que você quer saber? ")
+        pergunta = input("Pode perguntar!\n")
         if pergunta == ".":
             break
         try:
