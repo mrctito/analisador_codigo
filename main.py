@@ -19,66 +19,60 @@ from langchain_openai.embeddings import OpenAIEmbeddings
 from pydantic import BaseModel
 
 
-def cria_banco_vetorial():
-
-  # carrega o código fonte para o banco de dados vetorial
-  repo_path = Path(__file__).resolve().parent
-  print(str(repo_path))
-
-  py_files = list(repo_path.glob("*.py"))
-  py_files_count = len(py_files)
-  print(f"Arquivos py: {py_files_count}")
-  
-  loader = GenericLoader.from_filesystem(str(repo_path),
-                                        glob = "*.py",
-                                        suffixes=[".py"],
-                                        parser = LanguageParser(language=Language.PYTHON, parser_threshold=500),
-                                        show_progress=True,
+def cria_banco_vetorial(repo_path: Path, chunk_size: int, chunk_overlap: int, persist_directory: str):
+    print(f"Carregando arquivos de {repo_path}")
+    py_files = list(repo_path.glob("*.py"))
+    print(f"Arquivos py: {len(py_files)}")
+    
+    loader = GenericLoader.from_filesystem(
+        str(repo_path),
+        glob="*.py",
+        suffixes=[".py"],
+        parser=LanguageParser(language=Language.PYTHON, parser_threshold=500),
+        show_progress=True,
     )
     
-  documents = loader.load()
-  len(documents)
-
-
-  documents_splitter = RecursiveCharacterTextSplitter.from_language(language = Language.PYTHON,
-                                                             chunk_size = 2000,
-                                                             chunk_overlap = 200)
-
-  texts = documents_splitter.split_documents(documents)
-  len(texts)
-
-  #text-embedding-ada-002
-  embeddings=OpenAIEmbeddings(disallowed_special=(), openai_api_key=os.getenv("OPENAI_API_KEY"))
-
-  vectordb = Chroma.from_documents(texts, embedding=embeddings, persist_directory='./data')
-  vectordb.persist()
-
-  return vectordb
+    documents = loader.load()
+    documents_splitter = RecursiveCharacterTextSplitter.from_language(
+        language=Language.PYTHON,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap
+    )
+    texts = documents_splitter.split_documents(documents)
+    print(f"Textos separados: {len(texts)}")
+    
+    embeddings = OpenAIEmbeddings(disallowed_special=(), openai_api_key=os.getenv("OPENAI_API_KEY"))
+    vectordb = Chroma.from_documents(texts, embedding=embeddings, persist_directory=persist_directory)
+    vectordb.persist()
+    return vectordb
 
 def cria_chat(vectordb):
-    # cria o chat com o modelo de linguagem e o banco vetorial
     llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=os.getenv("OPENAI_API_KEY"), verbose=True)
-    memory = ConversationSummaryMemory(llm=llm, memory_key = "chat_history", return_messages=True)
+    memory = ConversationSummaryMemory(llm=llm, memory_key="chat_history", return_messages=True)
     qa = ConversationalRetrievalChain.from_llm(llm, retriever=vectordb.as_retriever(search_type="mmr", search_kwargs={"k":8}), memory=memory)
     return qa
 
-
 def main():
-  print("Analisador de Código Fonte")
-  load_dotenv()
-  vectordb = cria_banco_vetorial()
-  qa = cria_chat(vectordb)
-
-  while True:
-      print("\n")
-      pergunta = input("O que você quer saber? ")
-      if pergunta == ".":
-        break
-      resposta = qa.invoke(pergunta)
-      print("\n\n***\n\nResposta:\n\n"+resposta['answer'])
-
+    print("Analisador de Código Fonte")
+    load_dotenv()
+    
+    repo_path = Path(__file__).resolve().parent
+    chunk_size = 2000
+    chunk_overlap = 200
+    persist_directory = './data'
+    
+    vectordb = cria_banco_vetorial(repo_path, chunk_size, chunk_overlap, persist_directory)
+    qa = cria_chat(vectordb)
+    
+    while True:
+        pergunta = input("O que você quer saber? ")
+        if pergunta == ".":
+            break
+        try:
+            resposta = qa.invoke(pergunta)
+            print("\n\n***\n\nResposta:\n\n" + resposta['answer'])
+        except Exception as e:
+            print(f"Ocorreu um erro: {e}")
 
 if __name__ == "__main__":
-  main()
-
-
+    main()
