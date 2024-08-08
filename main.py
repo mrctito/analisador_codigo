@@ -23,7 +23,7 @@ def cria_banco_vetorial(repo_path: Path, chunk_size: int, chunk_overlap: int, pe
     print(f"Carregando arquivos de {repo_path}")
     py_files = list(repo_path.glob("*.py"))
     print(f"Arquivos py: {len(py_files)}")
-    
+
     loader = GenericLoader.from_filesystem(
         str(repo_path),
         glob="*.py",
@@ -31,7 +31,7 @@ def cria_banco_vetorial(repo_path: Path, chunk_size: int, chunk_overlap: int, pe
         parser=LanguageParser(language=Language.PYTHON, parser_threshold=500),
         show_progress=True,
     )
-    
+
     documents = loader.load()
     documents_splitter = RecursiveCharacterTextSplitter.from_language(
         language=Language.PYTHON,
@@ -40,32 +40,40 @@ def cria_banco_vetorial(repo_path: Path, chunk_size: int, chunk_overlap: int, pe
     )
     texts = documents_splitter.split_documents(documents)
     print(f"Textos separados: {len(texts)}")
-    
-    embeddings = OpenAIEmbeddings(disallowed_special=(), openai_api_key=os.getenv("OPENAI_API_KEY"))
-    vectordb = Chroma.from_documents(texts, embedding=embeddings, persist_directory=persist_directory)
+
+    embeddings = OpenAIEmbeddings(
+        disallowed_special=(), openai_api_key=os.getenv("OPENAI_API_KEY"))
+    vectordb = Chroma.from_documents(
+        texts, embedding=embeddings, persist_directory=persist_directory)
     vectordb.persist()
     return vectordb
 
+
 def cria_chat(vectordb):
-    llm = ChatOpenAI(model_name="gpt-4o", openai_api_key=os.getenv("OPENAI_API_KEY"), verbose=True)
-    memory = ConversationSummaryMemory(llm=llm, memory_key="chat_history", return_messages=True)
-    qa = ConversationalRetrievalChain.from_llm(llm, retriever=vectordb.as_retriever(search_type="mmr", search_kwargs={"k":8}), memory=memory)
+    llm = ChatOpenAI(model_name="gpt-4o-mini",
+                     openai_api_key=os.getenv("OPENAI_API_KEY"), verbose=True)
+    memory = ConversationSummaryMemory(
+        llm=llm, memory_key="chat_history", return_messages=True)
+    qa = ConversationalRetrievalChain.from_llm(llm, retriever=vectordb.as_retriever(
+        search_type="mmr", search_kwargs={"k": 8}), memory=memory)
     return qa
+
 
 def main():
     print("Analisador de Código Fonte")
     load_dotenv()
-    
+
     repo_path = Path(__file__).resolve().parent
     chunk_size = 2000
     chunk_overlap = 200
     persist_directory = './data'
-    
-    vectordb = cria_banco_vetorial(repo_path, chunk_size, chunk_overlap, persist_directory)
+
+    vectordb = cria_banco_vetorial(
+        repo_path, chunk_size, chunk_overlap, persist_directory)
     qa = cria_chat(vectordb)
-    
+
     while True:
-        pergunta = input("\n================\nPode perguntar!\n")
+        pergunta = input("\n================\nPode perguntar! ")
         if pergunta == ".":
             break
         try:
@@ -73,6 +81,7 @@ def main():
             print("\n\n***\n\nResposta:\n\n" + resposta['answer'])
         except Exception as e:
             print(f"Ocorreu um erro: {e}")
+
 
 if __name__ == "__main__":
     main()
